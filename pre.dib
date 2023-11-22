@@ -1,0 +1,9 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"fsharp","items":[{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+
+#!markdown
+
+# Polyglot Notebooks
+
+Testing out polyglot notebooks in preparation for Advent of Code 2023
