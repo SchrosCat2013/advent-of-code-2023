@@ -6,4 +6,24 @@
 
 # Polyglot Notebooks
 
-Testing out polyglot notebooks in preparation for Advent of Code 2023
+Testing out polyglot notebooks in preparation for Advent of Code 2023. I am still intending to use F# for this, to refresh myself on functional programming.
+
+## Simple code block
+
+#!fsharp
+
+// Define variable
+let var = 5
+
+printfn "Variable is %d" var
+
+#!markdown
+
+## Importing external code and displaying arrays
+
+#!fsharp
+
+#!import shared.fs
+
+// Reference variable defined in shared.fs
+Shared.myArray.Display()
