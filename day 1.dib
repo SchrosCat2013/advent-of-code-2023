@@ -120,8 +120,6 @@ substringMatches "wor" "hello world" 6 = true
 
 We can use this to iterate over the input string, and pull out all the numbers we find.
 
-Note - I switched this method to using spans for efficiency once the solution was complete.
-
 #!fsharp
 
 let conversions = Map [
@@ -191,5 +189,43 @@ fileContent
 
 #!markdown
 
-This gives the answer 55362, but the Advent of Code doesn't accept that. That's because of values such as
+This originally gave the answer 55362, but the Advent of Code doesn't accept that. That's because of values such as
 "oneight", which can be parsed as 1, 8. My initial code solution was parsing just the 1.
+
+Afterwards - Can I get the extractNumber function to use Spans instead of Strings (as the Substring call will be creating many unnecessary instances of a string?)
+
+I tried switching the original method to using spans, however the Map.tryFindKey did not like being passed a span. Apparently this is a mismatch between a higher-order-function and spans which are byref structs. Need to remove the Map.tryFindKey call.
+
+#!fsharp
+
+let extractNumber (input: ReadOnlySpan<char>) =
+    if input[0] >= '1' && input[0] <= '9'
+    then Some (int input[0] - int '0')
+    else if input.StartsWith("one") then Some 1
+    else if input.StartsWith("two") then Some 2
+    else if input.StartsWith("three") then Some 3
+    else if input.StartsWith("four") then Some 4
+    else if input.StartsWith("five") then Some 5
+    else if input.StartsWith("six") then Some 6
+    else if input.StartsWith("seven") then Some 7
+    else if input.StartsWith("eight") then Some 8
+    else if input.StartsWith("nine") then Some 9
+    else None
+
+
+let rec extractNumbers2 (accum: int list) (input: ReadOnlySpan<char>) =
+    if input.IsEmpty
+    then accum
+    else
+        let result =
+            match extractNumber input with
+            | Some number -> number::accum
+            | none -> accum
+
+        extractNumbers2 result (input.Slice 1)
+
+let extractNumbers2' (input: string) = extractNumbers2 [] input
+
+fileContent
+|> Seq.map (extractNumbers2' >> decodeCalibration)
+|> Seq.reduce (+)
