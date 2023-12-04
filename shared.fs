@@ -1,5 +1,6 @@
 module Shared =
-    let myArray = [|
-        "Test1"
-        "Test3"
-    |]
+    [<Struct>]
+    type Point = {
+        x: int
+        y: int
+    }
