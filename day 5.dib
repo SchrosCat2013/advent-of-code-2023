@@ -1,6 +1,6 @@
 #!meta
 
-{"kernelInfo":{"defaultKernelName":"fsharp","items":[{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"},{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
 
 #!markdown
 
@@ -115,21 +115,22 @@ What is the lowest location number that corresponds to any of the initial seed n
 open System.Text.RegularExpressions
 open Shared
 
+[<Struct>]
 type Item = {
-    value: int
+    value: int64
     itemType: string
 }
 
-type Range = {
-    sourceStart: int
-    destinationStart: int
-    length: int
+type MapRange = {
+    sourceStart: int64
+    destinationStart: int64
+    length: int64
 }
 
 type ChallengeMap = {
     sourceType: string
     destinationType: string
-    ranges: Range array
+    ranges: MapRange array
 }
 
 type ChallengeInput = {
@@ -141,9 +142,9 @@ let parseRange (input: string) =
     match input.Split(' ') with
     | [| dest; source; len |] ->
         {
-            sourceStart = int source
-            destinationStart = int dest
-            length = int len
+            sourceStart = int64 source
+            destinationStart = int64 dest
+            length = int64 len
         }
     | _ -> raise (InvalidOperationException $"Could not parse range { input }")
 
@@ -163,7 +164,7 @@ let parseInput (input: string array) =
     {
         initialSeeds =
             input[0].Substring(7).Split(' ')
-            |> Array.map (fun i -> { value = int i; itemType = "seed" })
+            |> Array.map (fun i -> { value = int64 i; itemType = "seed" })
         maps =
             input[2..]
             |> splitBy ""
@@ -215,10 +216,10 @@ Looks like that parses properly. Let's move on
 
 #!fsharp
 
-let inRange (value: int) (range: Range) =
+let inRange (value: int64) (range: MapRange) =
     value >= range.sourceStart && value < range.sourceStart + range.length
 
-let determineNextValue (value: int) (ranges: Range array) =
+let determineNextValue (value: int64) (ranges: MapRange array) =
     match ranges |> Array.tryFind (inRange value) with
     | Some range -> value - range.sourceStart + range.destinationStart
     | None -> value
@@ -267,4 +268,79 @@ let challengeInput =
     File.ReadAllLinesAsync "day 5 input.txt"
     |> Async.AwaitTask
     |> Async.RunSynchronously
-    |> 
+    |> parseInput
+
+lowestLocation challengeInput
+
+#!markdown
+
+## --- Part Two ---
+
+Everyone will starve if you only plant such a small number of seeds. Re-reading the almanac, it looks like the seeds: line actually describes ranges of seed numbers.
+
+The values on the initial seeds: line come in pairs. Within each pair, the first value is the start of the range and the second value is the length of the range. So, in the first line of the example above:
+
+```
+seeds: 79 14 55 13
+```
+
+This line describes two ranges of seed numbers to be planted in the garden. The first range starts with seed number 79 and contains 14 values: 79, 80, ..., 91, 92. The second range starts with seed number 55 and contains 13 values: 55, 56, ..., 66, 67.
+
+Now, rather than considering four seed numbers, you need to consider a total of 27 seed numbers.
+
+In the above example, the lowest location number can be obtained from seed number 82, which corresponds to soil 84, fertilizer 84, water 84, light 77, temperature 45, humidity 46, and location 46. So, the lowest location number is 46.
+
+Consider all of the initial seed numbers listed in the ranges on the first line of the almanac. What is the lowest location number that corresponds to any of the initial seed numbers?
+
+#!markdown
+
+Let's do a really naieve approach for now - list out all seeds and determine where they go. If we were being smart, we would determine when each range starts and ends within the next transform step.
+
+#!fsharp
+
+let seedRange = function
+| [| a; b |] -> { a.value .. a.value + b.value - 1L }
+| _ -> raise (InvalidOperationException "Should never happen")
+
+let allSeeds (input: Item array) =
+    input
+    |> Array.chunkBySize 2
+    |> Seq.collect seedRange
+
+sampleInput.initialSeeds |> allSeeds |> Seq.length
+
+#!fsharp
+
+challengeInput.initialSeeds |> allSeeds |> Seq.length
+
+#!markdown
+
+Took 20s. There are 2104769314 seeds to consider.
+
+I tried the below:
+```f#
+challengeInput.initialSeeds
+|> allSeeds
+|> Seq.map (fun i -> { value = i; itemType = "seed" })
+|> Seq.map (finalLocation challengeInput.maps)
+|> Seq.min
+```
+
+however, this had not completed after 4 mins. I need to do this the smart way.
+
+#!fsharp
+
+type Range = {
+    start: int64
+    length: int64
+}
+
+type ItemRange = {
+    itemType: string
+    Ranges: Range list
+}
+
+let convertInputRange (range: Range) (input: ItemRange) =
+    if input.start + input.length < range.start then ([], input)
+    else if 
+    
