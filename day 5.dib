@@ -330,6 +330,7 @@ however, this had not completed after 4 mins. I need to do this the smart way.
 
 #!fsharp
 
+[<Struct>]
 type Range = {
     start: int64
     length: int64
@@ -337,10 +338,124 @@ type Range = {
 
 type ItemRange = {
     itemType: string
-    Ranges: Range list
+    ranges: Range list
 }
 
-let convertInputRange (range: Range) (input: ItemRange) =
-    if input.start + input.length < range.start then ([], input)
-    else if 
+// Returns a tuple of (convertedRange: Range option, stillToBeConvertedRanges: Range list)
+// The stillToBeConvertedRanges may end up with up to two entries for a single input, if
+// it gets split in two
+let mapInputRange (mapRange: MapRange) (input: Range) =
+    // Note - start values are inclusive; end values are exclusive
+    let iStart = input.start
+    let iEnd = input.start + input.length
+    let rStart = mapRange.sourceStart
+    let rEnd = mapRange.sourceStart + mapRange.length
     
+    // input falls completely outside map
+    if iEnd <= rStart || iStart >= rEnd then (
+        None,
+        [ input ]
+    )
+    // input falls completely inside map
+    else if iStart >= rStart && iEnd <= rEnd then (
+        Some { start = iStart - rStart + mapRange.destinationStart; length = input.length },
+        []
+    )
+    // input overlaps both left and right bounds of map
+    else if iStart < rStart && iEnd > rEnd then (
+        Some { start = mapRange.destinationStart; length = mapRange.length },
+        [ { start = iStart; length = rStart - iStart }; { start = rEnd; length = iEnd - rEnd } ]
+    )
+    // input overlaps left bounds of map
+    else if iStart < rStart then (
+        Some { start = mapRange.destinationStart; length = iEnd - rStart },
+        [ { start = iStart; length = rStart - iStart }]
+    )
+    // input overlaps right bounds of map
+    else if iEnd > rEnd then (
+        Some { start = iStart - rStart + mapRange.destinationStart; length = rEnd - iStart },
+        [ { start = rEnd; length = iEnd - rEnd }]
+    )
+    // Error case
+    else raise (new InvalidOperationException $"Unexpected bounds condition converting range { input } with map { mapRange }")
+
+// Tests
+[|
+    { start = 50L; length = 10L }
+    { start = 50L; length = 11L }
+    { start = 49L; length = 10L }
+    { start = 49L; length = 11L }
+    { start = 49L; length = 12L }
+    { start = 51L; length = 8L }
+    { start = 51L; length = 9L }
+    { start = 51L; length = 10L }
+    { start = 49L; length = 8L }
+    { start = 49L; length = 9L }
+    { start = 60L; length = 1L }
+    { start = 49L; length = 1L }
+|]
+|> Array.map (mapInputRange { sourceStart = 50L; length = 10L; destinationStart = 20L })
+
+#!fsharp
+
+let rec nextSetOfRanges (mapRanges: Span<MapRange>) (outputRanges: Range list) (inputRanges: Range list) =
+    if mapRanges.IsEmpty then inputRanges@outputRanges
+    else if inputRanges.IsEmpty then outputRanges
+    else
+        let (nextOutputs, nextInputs) =
+            inputRanges
+            |> List.map (mapInputRange mapRanges[0])
+            |> List.unzip
+
+        nextSetOfRanges (mapRanges.Slice(1)) (List.choose Operators.id nextOutputs@outputRanges) (List.concat nextInputs)
+
+let toItemRange (input: Item array) =
+    {
+        itemType = input[0].itemType
+        ranges =
+            Seq.chunkBySize 2 input
+            |> Seq.map (function
+                | [| a; b |] -> { start = a.value; length = b.value }
+                | _ -> raise (InvalidOperationException "Item array did not consist of pairs of values")
+            )
+            |> List.ofSeq
+    }
+
+let sampleSeeds = toItemRange sampleInput.initialSeeds
+nextSetOfRanges (sampleInput.maps["seed"].ranges.AsSpan()) [] sampleSeeds.ranges
+
+#!markdown
+
+I think that looks right, let's try the final output
+
+#!fsharp
+
+let allStagesForSeedRange (mappings: Map<string, ChallengeMap>) (itemRange: ItemRange) =
+    seq {
+        let mutable current = itemRange
+        yield current
+        while mappings.ContainsKey current.itemType do
+            current <- {
+                itemType = mappings[current.itemType].destinationType
+                ranges = (nextSetOfRanges (mappings[current.itemType].ranges.AsSpan()) [] current.ranges)
+            }
+            yield current
+    }
+
+let startOfItemRange (range: Range) = range.start
+
+let lowestSoilForSeedRange (input: ChallengeInput) =
+    let soilRanges =
+        toItemRange input.initialSeeds
+        |> allStagesForSeedRange input.maps
+        |> Seq.last
+
+    soilRanges.ranges
+    |> Seq.map (fun x -> x.start)
+    |> Seq.min
+
+lowestSoilForSeedRange sampleInput
+
+#!fsharp
+
+lowestSoilForSeedRange challengeInput
