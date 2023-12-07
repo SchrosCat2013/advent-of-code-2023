@@ -398,7 +398,7 @@ let mapInputRange (mapRange: MapRange) (input: Range) =
 
 #!fsharp
 
-let rec nextSetOfRanges (mapRanges: Span<MapRange>) (outputRanges: Range list) (inputRanges: Range list) =
+let rec nextSetOfRangesRecursive (mapRanges: Span<MapRange>) (outputRanges: Range list) (inputRanges: Range list) =
     if mapRanges.IsEmpty then inputRanges@outputRanges
     else if inputRanges.IsEmpty then outputRanges
     else
@@ -407,7 +407,21 @@ let rec nextSetOfRanges (mapRanges: Span<MapRange>) (outputRanges: Range list) (
             |> List.map (mapInputRange mapRanges[0])
             |> List.unzip
 
-        nextSetOfRanges (mapRanges.Slice(1)) (List.choose Operators.id nextOutputs@outputRanges) (List.concat nextInputs)
+        nextSetOfRangesRecursive (mapRanges.Slice(1)) (List.choose Operators.id nextOutputs@outputRanges) (List.concat nextInputs)
+
+
+let nextSetOfRanges (mapRanges: MapRange seq) (outputRanges: Range list) (inputRanges: Range list) =
+    let folder (output: Range list, input: Range list) (mapRange: MapRange) =
+        let (nextOutput, nextInput) =
+            input
+            |> List.map (mapInputRange mapRange)
+            |> List.unzip
+
+        (List.choose id nextOutput@output, List.concat nextInput)
+    
+    mapRanges
+    |> Seq.fold folder ([], inputRanges)
+    ||> List.append
 
 let toItemRange (input: Item array) =
     {
@@ -422,7 +436,7 @@ let toItemRange (input: Item array) =
     }
 
 let sampleSeeds = toItemRange sampleInput.initialSeeds
-nextSetOfRanges (sampleInput.maps["seed"].ranges.AsSpan()) [] sampleSeeds.ranges
+nextSetOfRanges (sampleInput.maps["seed"].ranges) [] sampleSeeds.ranges
 
 #!markdown
 
@@ -437,7 +451,7 @@ let allStagesForSeedRange (mappings: Map<string, ChallengeMap>) (itemRange: Item
         while mappings.ContainsKey current.itemType do
             current <- {
                 itemType = mappings[current.itemType].destinationType
-                ranges = (nextSetOfRanges (mappings[current.itemType].ranges.AsSpan()) [] current.ranges)
+                ranges = (nextSetOfRanges (mappings[current.itemType].ranges) [] current.ranges)
             }
             yield current
     }
@@ -459,3 +473,7 @@ lowestSoilForSeedRange sampleInput
 #!fsharp
 
 lowestSoilForSeedRange challengeInput
+
+#!markdown
+
+12634632
