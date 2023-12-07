@@ -226,3 +226,49 @@ let numberWinningCombinations''' (race: Race) =
     count
 
 numberWinningCombinations''' (mergeRaceValues challengeInput)
+
+#!markdown
+
+Let's try the math approach.
+
+```
+d = t * (raceTime - t)
+```
+
+we want to find where the d > recordDistance, so where
+
+```
+t * (raceTime - t) - recordDistance > 0
+```
+
+The intersections will be where these equal zero.
+
+So, find the points where
+
+```
+t * raceTime - t^2 - recordDistance = 0
+t^2 -raceTime * t + recordDistance = 0
+```
+
+using the quadratic formula (`x = (-b +- sqrt(b^2 - 4ac) / 2a)`) gives us
+
+```
+t = raceTime +- sqrt(raceTime^2 - 4*recordDistance) / 2
+```
+
+#!fsharp
+
+let numberWinningCombinationsviaMaths (race: Race) =
+    let raceTime = double race.time
+    
+    let tmp = Math.Sqrt(raceTime ** 2.0 - 4.0 * double race.recordDistance)
+    let t = (raceTime - tmp) / 2.0 |> int
+    let t' = (raceTime + tmp) / 2.0 |> int
+
+    t' - t
+
+numberWinningCombinationsviaMaths (mergeRaceValues sampleInput)
+
+#!fsharp
+
+numberWinningCombinationsviaMaths (mergeRaceValues challengeInput)
