@@ -1,6 +1,6 @@
 #!meta
 
-{"kernelInfo":{"defaultKernelName":"fsharp","items":[{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"},{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
 
 #!markdown
 
@@ -100,7 +100,7 @@ sampleInput
 
 let winningOptionsForRace (race: Race) =
     distanceOptionsForTime race.time
-    |> Seq.filter (fun distance -> distance > race.recordDistance)
+    |> Seq.filter (fun i -> i > race.recordDistance)
 
 sampleInput
 |> Array.map winningOptionsForRace
@@ -170,3 +170,39 @@ mergeRaceValues challengeInput
 #!markdown
 
 29891250 in 0.6s. This doesn't seem like the most efficient way to solve the challenge - seems like a case where a math integral would make for a much cleaner solution. However, 0.6s isn't a problem here.
+
+#!fsharp
+
+let rec numberWinningCombinations' (race: Race) (t: int64) (accum: int) =
+    let distance = t * (race.time - t)
+    if distance > race.recordDistance
+    then numberWinningCombinations' race (t+1L) (accum+1)
+    else if accum > 0
+    then accum
+    else numberWinningCombinations' race (t+1L) 0
+
+numberWinningCombinations' (mergeRaceValues challengeInput) 0L 0
+
+#!markdown
+
+Recursively took 0.0 seconds. Much faster
+
+#!fsharp
+
+let numberWinningCombinations'' (race: Race) =
+    let mutable count = 0
+    let mutable i = 1L
+    let mutable d = i * (race.time - i)
+    
+    while count = 0 || d > race.recordDistance do
+        if d > race.recordDistance then count <- count + 1
+        i <- i + 1L
+        d <- i * (race.time - i)
+
+    count
+
+numberWinningCombinations'' (mergeRaceValues challengeInput)
+
+#!markdown
+
+Took 0.4s. Slower than recursively - interesting.
