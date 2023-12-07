@@ -205,4 +205,24 @@ numberWinningCombinations'' (mergeRaceValues challengeInput)
 
 #!markdown
 
-Took 0.4s. Slower than recursively - interesting.
+Took 0.4s. Slower than recursively - interesting. The next block is 0.0s again - branch prediction?
+
+#!fsharp
+
+let numberWinningCombinations''' (race: Race) =
+    let mutable count = 0
+    let mutable i = 1L
+    let mutable d = i * (race.time - i)
+    
+    while d < race.recordDistance do
+        i <- i + 1L
+        d <- i * (race.time - i)
+
+    while d > race.recordDistance do
+        i <- i + 1L
+        d <- i * (race.time - i)
+        count <- count + 1
+
+    count
+
+numberWinningCombinations''' (mergeRaceValues challengeInput)
