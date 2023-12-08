@@ -477,3 +477,15 @@ lowestSoilForSeedRange challengeInput
 #!markdown
 
 12634632
+
+How many ranges do we have at each stage?
+
+#!fsharp
+
+let countRangesByStage (input: ChallengeInput) =
+    toItemRange input.initialSeeds
+    |> allStagesForSeedRange input.maps
+    |> Seq.map (fun range -> (range.itemType, range.ranges.Length))
+    |> Array.ofSeq
+
+countRangesByStage challengeInput
