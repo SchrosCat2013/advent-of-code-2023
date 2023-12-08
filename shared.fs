@@ -22,3 +22,11 @@ module Shared =
                     cont <- enumerator.MoveNext()
                     if not cont then yield [||]
         }
+
+    // TODO - it would be good to get this to use an IAsyncEnumerable
+    // and parse each line as it comes in
+    let readAndParseInput<'T> (filename: string) (parser: string -> 'T) =
+        File.ReadAllLinesAsync filename
+        |> Async.AwaitTask
+        |> Async.RunSynchronously
+        |> Array.map parser
