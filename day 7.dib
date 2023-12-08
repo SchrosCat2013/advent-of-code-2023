@@ -142,10 +142,12 @@ let sampleInput =
 
 sampleInput
 
+let part1HandComparer = handComparer handRank cardRank
+
 #!fsharp
 
 sampleInput
-|> Array.sortWith (handComparer handRank cardRank)
+|> Array.sortWith part1HandComparer
 
 #!fsharp
 
@@ -154,13 +156,13 @@ type Game = Hand array
 let winningsForHand (rank: int) (hand: Hand) =
     (rank + 1) * hand.bid
 
-let totalWinnings (game: Game) handRanker cardRanker =
+let totalWinnings (handComparer: Hand -> Hand -> int) (game: Game) =
     game
-    |> Array.sortWith (handComparer handRanker cardRanker)
+    |> Array.sortWith handComparer
     |> Seq.mapi winningsForHand
     |> Seq.sum
 
-totalWinnings sampleInput handRank cardRank
+sampleInput |> totalWinnings part1HandComparer
 
 #!fsharp
 
@@ -169,7 +171,7 @@ open Shared
 
 let challengeInput = readAndParseInput "day 7 input.txt" parseInput
 
-totalWinnings challengeInput handRank cardRank
+challengeInput |> totalWinnings part1HandComparer
 
 #!markdown
 
@@ -233,8 +235,10 @@ let handRank' (hand: char seq) =
         | [||] -> 1
         | groups -> raise (InvalidOperationException $"Can't rank hand { hand } - unexpected grouping count { groups }")
 
-totalWinnings sampleInput handRank' cardRank'
+let part2HandComparer = handComparer handRank' cardRank'
+
+sampleInput |> totalWinnings part2HandComparer
 
 #!fsharp
 
-totalWinnings challengeInput handRank' cardRank'
+challengeInput |> totalWinnings part2HandComparer
