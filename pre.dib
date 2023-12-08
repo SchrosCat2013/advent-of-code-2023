@@ -1,6 +1,6 @@
 #!meta
 
-{"kernelInfo":{"defaultKernelName":"fsharp","items":[{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"},{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
 
 #!markdown
 
@@ -19,19 +19,18 @@ printfn "Variable is %d" var
 
 #!markdown
 
-## Importing external code and displaying arrays
+Test for splitBy method:
 
 #!fsharp
 
 #!import shared.fs
 
-// Reference variable defined in shared.fs
-Shared.myArray.Display()
-
-#!markdown
-
-Test for splitBy method:
+[| "hello"; "world"; ""; "my"; "name"; "is"; "bob"|]
+|> Shared.splitBy ""
+|> Array.ofSeq
 
 #!fsharp
 
-[| "hello", "world", "", "my", "name", "is", "bob"|] |> Shared.split
+[| ""; "hello"; "world"; ""; ""; "my"; "name"; "is"; "bob"; "" |]
+|> Shared.splitBy ""
+|> Array.ofSeq
