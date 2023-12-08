@@ -114,15 +114,15 @@ type Hand = {
 }
 
 // For use with Seq.sortWith, etc. Will give a positive number if hand1 > hand2, so the lower hand will be sorted first
-let handComparer (hand1: Hand) (hand2: Hand) =
-    match (handRank hand1.cards), (handRank hand2.cards) with
+let handComparer handRanker cardRanker (hand1: Hand) (hand2: Hand) =
+    match (handRanker hand1.cards), (handRanker hand2.cards) with
     | rank1, rank2 when rank1 <> rank2 -> rank1 - rank2
     | _ ->
         let firstMismatchingCard = 
             Seq.zip hand1.cards hand2.cards
             |> Seq.tryFind (fun (a, b) -> a <> b)
         match firstMismatchingCard with
-        | Some (card1, card2) -> (cardRank card1) - (cardRank card2)
+        | Some (card1, card2) -> (cardRanker card1) - (cardRanker card2)
         | None -> 0
 
 let parseInput (input: string) = {
@@ -145,7 +145,7 @@ sampleInput
 #!fsharp
 
 sampleInput
-|> Array.sortWith handComparer
+|> Array.sortWith (handComparer handRank cardRank)
 
 #!fsharp
 
@@ -154,13 +154,13 @@ type Game = Hand array
 let winningsForHand (rank: int) (hand: Hand) =
     (rank + 1) * hand.bid
 
-let totalWinnings (game: Game) =
+let totalWinnings (game: Game) handRanker cardRanker =
     game
-    |> Array.sortWith handComparer
+    |> Array.sortWith (handComparer handRanker cardRanker)
     |> Seq.mapi winningsForHand
     |> Seq.sum
 
-totalWinnings sampleInput
+totalWinnings sampleInput handRank cardRank
 
 #!fsharp
 
@@ -169,4 +169,72 @@ open Shared
 
 let challengeInput = readAndParseInput "day 7 input.txt" parseInput
 
-totalWinnings challengeInput
+totalWinnings challengeInput handRank cardRank
+
+#!markdown
+
+## --- Part Two ---
+To make things a little more interesting, the Elf introduces one additional rule. Now, J cards are jokers - wildcards that can act like whatever card would make the hand the strongest type possible.
+
+To balance this, J cards are now the weakest individual cards, weaker even than 2. The other cards stay in the same order: A, K, Q, T, 9, 8, 7, 6, 5, 4, 3, 2, J.
+
+J cards can pretend to be whatever card is best for the purpose of determining hand type; for example, `QJJQ2` is now considered four of a kind. However, for the purpose of breaking ties between two hands of the same type, J is always treated as J, not the card it's pretending to be: `JKKK2` is weaker than `QQQQ2` because J is weaker than Q.
+
+Now, the above example goes very differently:
+
+```
+32T3K 765
+T55J5 684
+KK677 28
+KTJJT 220
+QQQJA 483
+```
+
+`32T3K` is still the only one pair; it doesn't contain any jokers, so its strength doesn't increase.
+`KK677` is now the only two pair, making it the second-weakest hand.
+`T55J5`, `KTJJT`, and `QQQJA` are now all four of a kind! `T55J5` gets rank 3, `QQQJA` gets rank 4, and `KTJJT` gets rank 5.
+With the new joker rule, the total winnings in this example are 5905.
+
+Using the new joker rule, find the rank of every hand in your set. What are the new total winnings?
+
+#!fsharp
+
+let cardRank' = function
+| c when c >= '2' && c <= '9' -> int c - int '0'
+| 'T' -> 10
+| 'J' -> 1
+| 'Q' -> 12
+| 'K' -> 13
+| 'A' -> 14
+| c -> raise (InvalidOperationException $"Unknown card value { c }")
+
+let handRank' (hand: char seq) =
+    let jokerCount = hand |> Seq.where ((=) 'J') |> Seq.length
+
+    hand
+    |> Seq.filter ((<>) 'J')
+    |> Seq.countBy id
+    |> Seq.choose (fun (card, count) -> if count > 1 then Some count else None)
+    |> Seq.sortDescending
+    |> Array.ofSeq
+    |> function
+        | [||] when jokerCount = 0 -> [||]
+        | [||] -> [| min 5 (1 + jokerCount) |]
+        | [| x |] -> [| x + jokerCount |]
+        | [| x; y |] -> [| x + jokerCount; y |]
+        | _ -> raise (InvalidOperationException $"More than two pairs found in hand { hand } - this should not be possible")
+    |> function
+        | [| 5 |] -> 7
+        | [| 4 |] -> 6
+        | [| 3; 2 |] -> 5
+        | [| 3 |] -> 4
+        | [| 2; 2 |] -> 3
+        | [| 2 |] -> 2
+        | [||] -> 1
+        | groups -> raise (InvalidOperationException $"Can't rank hand { hand } - unexpected grouping count { groups }")
+
+totalWinnings sampleInput handRank' cardRank'
+
+#!fsharp
+
+totalWinnings challengeInput handRank' cardRank'
