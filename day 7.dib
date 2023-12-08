@@ -220,8 +220,8 @@ let handRank' (hand: char seq) =
     |> Seq.sortDescending
     |> Array.ofSeq
     |> function
-        | [||] when jokerCount = 0 -> [||]
-        | [||] -> [| min 5 (1 + jokerCount) |]
+        | [||] when jokerCount = 0 -> [||] // No jokers, no pairs
+        | [||] -> [| min 5 (1 + jokerCount) |] // Joker will make a pair with another card. min 5 in case hand is entirely jokers
         | [| x |] -> [| x + jokerCount |]
         | [| x; y |] -> [| x + jokerCount; y |]
         | _ -> raise (InvalidOperationException $"More than two pairs found in hand { hand } - this should not be possible")
