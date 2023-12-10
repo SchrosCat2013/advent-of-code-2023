@@ -363,32 +363,34 @@ let primes = [|
 |]
 
 let leastCommonMultiple (input: int array) =
-    let isDivisibleByPrime (primeIndex: int) (i: int) = i % primes[primeIndex] = 0
+    let isDivisibleByPrime (prime: int) (i: int) = i % prime = 0
 
-    let nextLayerMap (primeIndex: int) (i: int) =
-        if isDivisibleByPrime primeIndex i
-        then i / primes[primeIndex]
+    let nextLayerMap (prime: int) (i: int) =
+        if isDivisibleByPrime prime i
+        then i / prime
         else i
 
-    let rec next (layer: int array) (primeIndex: int) (result: int list) =
+    let folder (layer: int array, result: int64) (prime: int) =
         let anyDivisible = 
             layer
-            |> Seq.exists (isDivisibleByPrime primeIndex)
+            |> Seq.exists (fun i -> i % prime = 0)
         
         if anyDivisible
         then
             let nextLayer =
                 layer
-                |> Array.map (nextLayerMap primeIndex)
-            next nextLayer (primeIndex + 1) (primes[primeIndex]::result)
-        else if primeIndex + 1 < primes.Length
-        then next layer (primeIndex + 1) result
+                |> Array.map (nextLayerMap prime)
+            (nextLayer, result * int64 prime)
         else
-            Seq.append result layer
-            |> Seq.map int64
-            |> Seq.reduce (*)
+            (layer, result)
 
-    next input 0 []
+    let (finalLayer, p) =
+        primes
+        |> Seq.takeWhile (fun x -> input |> Array.forall ((<) x))
+        |> Seq.fold folder (input, 1)
+    
+    p * (finalLayer |> Seq.map int64 |> Seq.reduce (*))
+    
 
 let ghostWalk'''' (input: ChallengeInput) =
     sequenceLengths input
@@ -399,3 +401,7 @@ ghostWalk'''' sampleInput3
 #!fsharp
 
 ghostWalk'''' challengeInput
+
+#!markdown
+
+result = 21083806112641
