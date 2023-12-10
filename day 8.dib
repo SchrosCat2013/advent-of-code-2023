@@ -1,6 +1,6 @@
 #!meta
 
-{"kernelInfo":{"defaultKernelName":"fsharp","items":[{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"},{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
 
 #!markdown
 
@@ -116,20 +116,17 @@ let followDirection (nodes: Map<string, Node>) (current: string) (direction: Dir
     | Left -> nodes[current].left
     | Right -> nodes[current].right
 
+let rec next (input: ChallengeInput) (index: int) (node: string) =
+    seq {
+        yield node
+        let nextIndex = (index + 1) % input.directions.Length
+        let nextNode = followDirection input.nodes node input.directions[index]
+        yield! next input nextIndex nextNode
+    }
+
 let followDirections (input: ChallengeInput) =
-        let rec next (index: int) (node: string) =
-            seq {
-                yield node
-                if node <> "ZZZ" then
-                    let nextIndex = (index + 1) % input.directions.Length
-                    let nextNode = followDirection input.nodes node input.directions[index]
-                    yield! next nextIndex nextNode
-            }
-
-        next 0 "AAA"
-
-let stepsRequired input =
-    (followDirections input |> Seq.length) - 1
+        next input 0 "AAA"
+        |> Seq.takeWhile (fun node -> node <> "ZZZ")
 
 followDirections sampleInput1
 
@@ -141,6 +138,264 @@ let challengeInput =
     |> Async.RunSynchronously
     |> parseInput
 
+followDirections challengeInput |> Seq.length
+
+#!markdown
+
+## --- Part Two ---
+The sandstorm is upon you and you aren't any closer to escaping the wasteland. You had the camel follow the instructions, but you've barely left your starting position. It's going to take significantly more steps to escape!
+
+What if the map isn't for people - what if the map is for ghosts? Are ghosts even bound by the laws of spacetime? Only one way to find out.
+
+After examining the maps a bit longer, your attention is drawn to a curious fact: the number of nodes with names ending in A is equal to the number ending in Z! If you were a ghost, you'd probably just start at every node that ends with A and follow all of the paths at the same time until they all simultaneously end up at nodes that end with Z.
+
+For example:
+
+```
+LR
+
+11A = (11B, XXX)
+11B = (XXX, 11Z)
+11Z = (11B, XXX)
+22A = (22B, XXX)
+22B = (22C, 22C)
+22C = (22Z, 22Z)
+22Z = (22B, 22B)
+XXX = (XXX, XXX)
+```
+
+Here, there are two starting nodes, 11A and 22A (because they both end with A). As you follow each left/right instruction, use that instruction to simultaneously navigate away from both nodes you're currently on. Repeat this process until all of the nodes you're currently on end with Z. (If only some of the nodes you're on end with Z, they act like any other node and you continue as normal.) In this example, you would proceed as follows:
+
+* Step 0: You are at 11A and 22A.
+* Step 1: You choose all of the left paths, leading you to 11B and 22B.
+* Step 2: You choose all of the right paths, leading you to 11Z and 22C.
+* Step 3: You choose all of the left paths, leading you to 11B and 22Z.
+* Step 4: You choose all of the right paths, leading you to 11Z and 22B.
+* Step 5: You choose all of the left paths, leading you to 11B and 22C.
+* Step 6: You choose all of the right paths, leading you to 11Z and 22Z.
+
+So, in this example, you end up entirely on nodes that end in Z after 6 steps.
+
+Simultaneously start on every node that ends with A. How many steps does it take before you're only on nodes that end with Z?
+
+#!fsharp
+
+#!import shared.fs
+open Shared
+
+let sampleInput3 =
+    [|
+        "LR"
+        ""
+        "11A = (11B, XXX)"
+        "11B = (XXX, 11Z)"
+        "11Z = (11B, XXX)"
+        "22A = (22B, XXX)"
+        "22B = (22C, 22C)"
+        "22C = (22Z, 22Z)"
+        "22Z = (22B, 22B)"
+        "XXX = (XXX, XXX)"
+    |]
+    |> parseInput
+
+let isStartingNode (node: string) = node[2] = 'A'
+let isEndingNode (node: string) = node[2] = 'Z'
+
+let startingNodes (input: ChallengeInput) =
+    input.nodes.Keys
+    |> Seq.filter isStartingNode
+    |> Array.ofSeq
+
+let ghostWalks (input: ChallengeInput) =
+    startingNodes input
+    |> Array.map (next input 0)
+    |> transposeSequences
+    |> Seq.takeWhile (Array.exists (not << isEndingNode))
+    
+ghostWalks sampleInput3
+
+#!fsharp
+
+ghostWalks challengeInput
+|> Seq.indexed
+|> Seq.where (fun (i, nodes) -> nodes |> Seq.filter isEndingNode |> Seq.length > 1)
+|> Seq.take 10
+
+#!markdown
+
+The previous approach seems too slow / inefficient. Let's try with a single sequence generator, rather than re-using the same individual sequence generator 6 times
+
+#!fsharp
+
+let rec next' (input: ChallengeInput) (index: int) (nodes: string array) =
+    seq {
+        yield nodes
+        let nextIndex = (index + 1) % input.directions.Length
+        let nextNodes =
+            nodes
+            |> Array.map (fun n -> followDirection input.nodes n input.directions[index])
+        yield! next' input nextIndex nextNodes
+    }
+
+let ghostWalks' (input: ChallengeInput) =
+    startingNodes input
+    |> next' input 0
+    |> Seq.takeWhile (Array.exists (not << isEndingNode))
 
 
-stepsRequired challengeInput
+ghostWalks' challengeInput |> Seq.take 100
+
+#!markdown
+
+I think I should figure out the sequence length for each starting position and see if we can use that to determine how long before each option lands on an exit node.
+
+But first, I want to try optimising the code as much as possible
+
+#!fsharp
+
+open System.Collections.Generic
+
+type Node' = {
+    id: string
+    isStartNode : bool
+    isEndNode : bool
+    [<DefaultValue>] mutable left: Node'
+    [<DefaultValue>] mutable right: Node'
+}
+
+let buildNodeGraph (input: ChallengeInput) =
+    let nodes = Dictionary<string, Node'> ()
+
+    let rec buildNode' (node: Node) =
+        match nodes.TryGetValue(node.id) with
+        | (true, result) -> result
+        | (false, _) ->
+            let mutable result = {
+                id = node.id
+                isStartNode = isStartingNode node.id
+                isEndNode = isEndingNode node.id
+            }
+            nodes.Add(node.id, result)
+            result.left <- buildNode' input.nodes[node.left]
+            result.right <- buildNode' input.nodes[node.right]
+
+            result
+
+    input.nodes.Values |> Seq.map buildNode' |> Array.ofSeq
+
+let rec countToEndNode (input: ChallengeInput) (current: Node' array) (index: int) (count: int64) =
+    if current |> Array.forall (fun node -> node.isEndNode)
+    then count
+    else
+        let direction = input.directions[index]
+
+        // Assign back into the input array to prevent allocations
+        for i in 0..current.Length - 1 do
+            match direction with
+            | Left -> current[i] <- current[i].left
+            | Right -> current[i] <- current[i].right
+            
+        
+        countToEndNode input current ((index + 1) % input.directions.Length) (count + 1L)
+
+let ghostWalk'' (input: ChallengeInput) =
+    let nodeGraph = buildNodeGraph input
+    let start = nodeGraph |> Array.filter (fun node -> node.isStartNode)
+
+    countToEndNode input start 0 0L
+
+// Note, takes a while to output as it is a cyclic graph
+buildNodeGraph sampleInput3
+
+#!fsharp
+
+ghostWalk'' sampleInput3
+
+#!markdown
+
+```f#
+ghostWalk'' challengeInput
+```
+
+This had not produced a response in over 10 mins. I think the code is about as efficient as I can make it. Lets go to a sequence length approach
+
+#!fsharp
+
+let followDirections' (input: ChallengeInput) (start: string) =
+    next input 0 start
+    |> Seq.takeWhile (not << isEndingNode)
+    
+let sequenceLengths (input: ChallengeInput) =
+    input.nodes.Keys
+    |> Seq.filter (isStartingNode)
+    |> Seq.map (followDirections' input >> Seq.length)
+    |> Array.ofSeq
+
+sequenceLengths sampleInput3
+
+#!fsharp
+
+sequenceLengths challengeInput
+
+#!fsharp
+
+let primes = [|
+    2;3;5;7;11;13;17;19;23;29
+    31;37;41;43;47;53;59;61;67;71
+    73;79;83;89;97;101;103;107;109;113
+    127;131;137;139;149;151;157;163;167;173
+    179;181;191;193;197;199;211;223;227;229
+    233;239;241;251;257;263;269;271;277;281
+    283;293;307;311;313;317;331;337;347;349
+    353;359;367;373;379;383;389;397;401;409
+    419;421;431;433;439;443;449;457;461;463
+    467;479;487;491;499;503;509;521;523;541
+    547;557;563;569;571;577;587;593;599;601
+    607;613;617;619;631;641;643;647;653;659
+    661;673;677;683;691;701;709;719;727;733
+    739;743;751;757;761;769;773;787;797;809
+    811;821;823;827;829;839;853;857;859;863
+    877;881;883;887;907;911;919;929;937;941
+    947;953;967;971;977;983;991;997;1009;1013
+    1019;1021;1031;1033;1039;1049;1051;1061;1063;1069
+    1087;1091;1093;1097;1103;1109;1117;1123;1129;1151
+    1153;1163;1171;1181;1187;1193;1201;1213;1217;1223
+|]
+
+let leastCommonMultiple (input: int array) =
+    let isDivisibleByPrime (primeIndex: int) (i: int) = i % primes[primeIndex] = 0
+
+    let nextLayerMap (primeIndex: int) (i: int) =
+        if isDivisibleByPrime primeIndex i
+        then i / primes[primeIndex]
+        else i
+
+    let rec next (layer: int array) (primeIndex: int) (result: int list) =
+        let anyDivisible = 
+            layer
+            |> Seq.exists (isDivisibleByPrime primeIndex)
+        
+        if anyDivisible
+        then
+            let nextLayer =
+                layer
+                |> Array.map (nextLayerMap primeIndex)
+            next nextLayer (primeIndex + 1) (primes[primeIndex]::result)
+        else if primeIndex + 1 < primes.Length
+        then next layer (primeIndex + 1) result
+        else
+            Seq.append result layer
+            |> Seq.map int64
+            |> Seq.reduce (*)
+
+    next input 0 []
+
+let ghostWalk'''' (input: ChallengeInput) =
+    sequenceLengths input
+    |> leastCommonMultiple
+
+ghostWalk'''' sampleInput3
+
+#!fsharp
+
+ghostWalk'''' challengeInput

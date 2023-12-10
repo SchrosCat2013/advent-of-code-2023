@@ -1,4 +1,5 @@
 open System.Text.RegularExpressions
+open System.Collections.Generic
 
 module Shared =
     [<Struct>]
@@ -30,3 +31,23 @@ module Shared =
         |> Async.AwaitTask
         |> Async.RunSynchronously
         |> Array.map parser
+
+    let transposeSequences<'T> (input: 'T seq seq) =
+        let rec next (enumerators: IEnumerator<'T> array) = seq {
+            if enumerators |> Array.forall (fun e -> e.MoveNext())
+            then
+                yield enumerators |> Array.map (fun e -> e.Current)
+                yield! next enumerators
+        }
+
+        seq {
+            let enumerators =
+                input
+                |> Seq.map (fun x -> x.GetEnumerator())
+                |> Array.ofSeq
+
+            try
+                yield! next enumerators
+            finally
+                enumerators |> Array.iter (fun e -> e.Dispose())
+        }
