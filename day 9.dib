@@ -162,24 +162,24 @@ Let's go with the summation approach for now, or even a sequence generator. I'm 
 
 #!fsharp
 
-let rec fnSeq' (input: PolynomialSequence) (state: int array) =
+let rec fnSeq' (op: int->int->int) (input: PolynomialSequence) (state: int array) =
     seq {
         yield state[0]
 
         let intermediate =
             if state.Length = input.Length
             then state
-            else Array.append state [| input[state.Length] |]
+            else Array.append state [| op input[state.Length] 0 |]
 
-        let folder i state = (i+state, i+state)
+        let folder i state = (op i state, op i state)
         let (next, _) =
             (intermediate, 0)
             ||> Array.mapFoldBack folder
 
-        yield! fnSeq input next
+        yield! fnSeq' op input next
     }
 
-let fnSeq (input: PolynomialSequence) = fnSeq' input [| input[0] |]
+let forwardFnSeq (input: PolynomialSequence) = fnSeq' (+) input [| input[0] |]
 
 sampleInput
 |> Array.map (fnSeq >> Seq.take 7)
@@ -218,3 +218,46 @@ Cool, every input sequence is 21 entries long. We should be able to solve the ch
 challengeInput
 |> Seq.map (fnSeq >> Seq.item 21)
 |> Seq.sum
+
+#!markdown
+
+## --- Part Two ---
+Of course, it would be nice to have even more history included in your report. Surely it's safe to just extrapolate backwards as well, right?
+
+For each history, repeat the process of finding differences until the sequence of differences is entirely zero. Then, rather than adding a zero to the end and filling in the next values of each previous sequence, you should instead add a zero to the beginning of your sequence of zeroes, then fill in new first values for each previous sequence.
+
+In particular, here is what the third example history looks like when extrapolating back in time:
+
+```
+5  10  13  16  21  30  45
+  5   3   3   5   9  15
+   -2   0   2   4   6
+      2   2   2   2
+        0   0   0
+```
+
+Adding the new values on the left side of each sequence from bottom to top eventually reveals the new left-most history value: 5.
+
+Doing this for the remaining example data above results in previous values of -3 for the first history and 0 for the second history. Adding all three new values together produces 2.
+
+Analyze your OASIS report again, this time extrapolating the previous value for each history. What is the sum of these extrapolated values?# 
+
+#!fsharp
+
+let revFnSeq (input: PolynomialSequence) = fnSeq' (-) input (Array.ofList input)
+
+sampleInput[2]
+|> revFnSeq
+|> Seq.take 2
+
+#!fsharp
+
+sampleInput
+|> Array.map (revFnSeq >> Seq.item 1)
+|> Array.sum
+
+#!fsharp
+
+challengeInput
+|> Array.map (revFnSeq >> Seq.item 1)
+|> Array.sum
