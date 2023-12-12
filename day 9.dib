@@ -129,10 +129,10 @@ let rec fnDoesntWork (c: PolynomialSequence) (i: int) =
     match c, i with
     | _, -1 -> 0
     | [], _ -> 0
-    | cn::tail, _ -> i * (fn tail (i-1)) + cn
+    | cn::tail, _ -> i * (fnDoesntWork tail (i-1)) + cn
 
 sampleInput
-|> Array.map (fun input -> Seq.map (fn input) { 0..5 })
+|> Array.map (fun input -> Seq.map (fnDoesntWork input) { 0..5 })
 
 #!markdown
 
@@ -182,12 +182,12 @@ let rec fnSeq' (op: int->int->int) (input: PolynomialSequence) (state: int array
 let forwardFnSeq (input: PolynomialSequence) = fnSeq' (+) input [| input[0] |]
 
 sampleInput
-|> Array.map (fnSeq >> Seq.take 7)
+|> Array.map (forwardFnSeq >> Seq.take 7)
 
 #!fsharp
 
 sampleInput
-|> Seq.map (fnSeq >> Seq.item 6)
+|> Seq.map (forwardFnSeq >> Seq.item 6)
 |> Seq.sum
 
 #!markdown
@@ -216,7 +216,7 @@ Cool, every input sequence is 21 entries long. We should be able to solve the ch
 #!fsharp
 
 challengeInput
-|> Seq.map (fnSeq >> Seq.item 21)
+|> Seq.map (forwardFnSeq >> Seq.item 21)
 |> Seq.sum
 
 #!markdown
@@ -260,4 +260,44 @@ sampleInput
 
 challengeInput
 |> Array.map (revFnSeq >> Seq.item 1)
+|> Array.sum
+
+#!markdown
+
+I want to have a go at making the function cleaner. Let's try where a sequence depends on other sequences
+
+#!fsharp
+
+let rec fnSeq'' (op: int->int->int) (skip: int) (input: PolynomialSequence) =
+    match input with
+    | [] -> seq {
+            while true do
+                yield 0
+        }
+    | head::tail ->
+        fnSeq'' op skip tail
+        |> Seq.skip skip
+        |> Seq.scan (fun i next -> op i next) head
+
+let forwardFnSeq' = fnSeq'' (+) 0
+let revFnSeq' = fnSeq'' (-) 1
+
+sampleInput
+|> Array.map (forwardFnSeq' >> Seq.take 7)
+
+#!fsharp
+
+challengeInput
+|> Seq.map (forwardFnSeq >> Seq.item 21)
+|> Seq.sum
+
+#!fsharp
+
+sampleInput
+|> Array.map (revFnSeq' >> Seq.take 3)
+
+#!fsharp
+
+challengeInput
+|> Array.map (revFnSeq' >> Seq.item 1)
 |> Array.sum
