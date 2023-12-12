@@ -276,8 +276,8 @@ let rec fnSeq'' (op: int->int->int) (skip: int) (input: PolynomialSequence) =
         }
     | head::tail ->
         fnSeq'' op skip tail
-        |> Seq.skip skip
         |> Seq.scan (fun i next -> op i next) head
+        |> Seq.skip skip
 
 let forwardFnSeq' = fnSeq'' (+) 0
 let revFnSeq' = fnSeq'' (-) 1
@@ -299,5 +299,5 @@ sampleInput
 #!fsharp
 
 challengeInput
-|> Array.map (revFnSeq' >> Seq.item 1)
+|> Array.map (revFnSeq' >> Seq.head)
 |> Array.sum
