@@ -158,8 +158,8 @@ let parseInput (input: string array) =
         | (true, true, false, false) -> EastWest
         | (false, false, true, true) -> NorthSouth
         | (true, false, true, false) -> NorthWest
-        | (true, false, false, true) -> NorthEast
-        | (false, true, true, false) -> SouthWest
+        | (true, false, false, true) -> SouthWest
+        | (false, true, true, false) -> NorthEast
         | (false, true, false, true) -> SouthEast
         | _ -> raise (InvalidOperationException "Could not determine orientation of starting pipe")
 
@@ -255,25 +255,40 @@ let rec path (input: ChallengeInput) (prev: Point) (point: Point) =
         }
 
 let paths (input: ChallengeInput) =
-    input
-    |> nextPoints
+    nextPoints input input.start
     |> Array.map (path input input.start)
 
 paths sampleInput2
 
 #!fsharp
 
-let deduplicate (paths: Point seq array) =
-    let isLastPair ((prev1, prev2), (point1, point2)) =
-        prev1 = prev2 || prev1 = point2 || prev2 = point1
+let countFurthestPoint (paths: Point seq array) =
+    let isLastPair (index, ((prev1, prev2), (point1, point2))) =
+        index > 0 && (prev1 = prev2 || prev1 = point2 || prev2 = point1)
 
     match paths with
     | [| path1; path2 |] ->
         Seq.zip path1 path2
         |> Seq.pairwise
+        |> Seq.indexed
         |> Seq.takeWhile (not << isLastPair)
-        |> Seq.map snd
+        |> Seq.length
     | _ -> raise (InvalidOperationException "More than two paths passed to deduplicate function")
 
 paths sampleInput2
-|> deduplicate
+|> countFurthestPoint
+
+#!fsharp
+
+let challengeInput =
+    File.ReadAllLinesAsync "day 10 input.txt"
+    |> Async.AwaitTask
+    |> Async.RunSynchronously
+    |> parseInput
+
+renderGrid challengeInput.pipes
+
+#!fsharp
+
+paths challengeInput
+|> countFurthestPoint
