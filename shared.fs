@@ -90,3 +90,15 @@ module Array2D =
     
     let tryFindIndex<'T> (predicate: 'T -> bool) (array: 'T[,]) =
         tryFindIndexImpl predicate 0 0 array
+
+    let countWherei<'T> (predicate: int -> int -> 'T -> bool) (array: 'T[,]) =
+        let mutable count = 0
+        for y = 0 to Array2D.length1 array - 1 do
+            for x = 0 to Array2D.length2 array - 1 do
+                if predicate y x array[y, x]
+                then count <- count + 1
+        
+        count
+
+    let countWhere<'T> (predicate: 'T -> bool) (array: 'T[,]) =
+        countWherei (fun y x -> predicate) array
