@@ -51,3 +51,42 @@ module Shared =
             finally
                 enumerators |> Array.iter (fun e -> e.Dispose())
         }
+
+module Array2D =
+    let tryGet<'T> (y: int) (x: int) (array: 'T[,]) =
+        if y >= 0 && x >= 0 && y < (Array2D.length1 array) && x < (Array2D.length2 array)
+        then Some array[y, x]
+        else None
+
+    let rows<'T> (array: 'T[,]) =
+        let (length1, length2) = (Array2D.length1 array, Array2D.length2 array)
+        { 0 .. length1 - 1 }
+        |> Seq.map (fun y -> Array.init length2 (fun x -> array[y, x]))
+
+    let renderChars (array: char[,]) =
+        let sb = StringBuilder()
+        for y = 0 to Array2D.length1 array - 1 do
+            for x = 0 to Array2D.length2 array - 1 do
+                sb.Append array[y,x]
+            sb.AppendLine()
+
+        sb.ToString()
+
+    let foldi (folder: int -> int -> 'S -> 'T -> 'S) (state: 'S) (array: 'T[,]) =
+        let mutable state = state
+        for y in 0 .. Array2D.length1 array - 1 do
+            for x in 0 .. Array2D.length2 array - 1 do
+                state <- folder y x state (array.[y, x])
+        state
+
+    let rec private tryFindIndexImpl<'T> (predicate: 'T -> bool) (y: int) (x: int) (array: 'T[,]) =
+        if (predicate array[y,x])
+        then Some (y, x)
+        else if y + 1 >= Array2D.length1 array && x + 1 >= Array2D.length2 array
+        then None
+        else if x + 1 >= Array2D.length2 array
+        then tryFindIndexImpl predicate (y+1) 0 array
+        else tryFindIndexImpl predicate y (x+1) array
+    
+    let tryFindIndex<'T> (predicate: 'T -> bool) (array: 'T[,]) =
+        tryFindIndexImpl predicate 0 0 array
