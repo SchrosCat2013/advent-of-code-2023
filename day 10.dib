@@ -564,6 +564,7 @@ x=0..2, y=2
 
 #!fsharp
 
+// This is too slow an algorithm for the challengeInput
 let countVerticalSegmentsLeftOf (segments: Segment array) (y: int) (x: int) =
     segments
     |> Seq.filter (fun seg -> x > seg.x1 && y >= seg.y1 && y < seg.y2)
@@ -582,4 +583,102 @@ let countNestPossibilities (input: ChallengeInput) =
     input.pipes
     |> Array2D.countWherei isNest
 
-countNestPossibilities challengeInput
+countNestPossibilities sampleInput2
+
+#!fsharp
+
+let sampleInput3 =
+    [|
+        "FF7FSF7F7F7F7F7F---7"
+        "L|LJ||||||||||||F--J"
+        "FL-7LJLJ||||||LJL-77"
+        "F--JF--7||LJLJ7F7FJ-"
+        "L---JF-JLJ.||-FJLJJ7"
+        "|F|F-JF---7F7-L7L|7|"
+        "|FFJF7L7F-JF7|JL---7"
+        "7-L-JL7||F7|L7F-7F7|"
+        "L.L7LFJ|||||FJL7||LJ"
+        "L7JLJL-JLJLJL--JLJ.L"
+    |]
+    |> parseInput
+
+renderGrid sampleInput3.pipes
+
+#!fsharp
+
+type Square =
+    | Pipe
+    | Inside
+    | Outside
+
+type EntryDirection = | North | South | NotInPipe
+
+let findInsideArea (input: ChallengeInput) =
+
+    // This is just going to be so much easier with imperative code
+    let (length1, length2) = (Array2D.length1 input.pipes, Array2D.length2 input.pipes)
+    let array = Array2D.create length1 length2 Outside
+
+    (paths input)[0]
+    |> Seq.iter (fun point -> array[point.y, point.x] <- Pipe)
+
+    for y = 0 to length1 - 1 do
+        let mutable inside = false
+        let mutable entryDirection = NotInPipe
+
+        for x = 0 to length2 - 1 do
+            if array[y, x] = Pipe
+            then
+                match input.pipes[y, x] with
+                | Some NorthSouth ->
+                    inside <- not inside
+                    entryDirection <- NotInPipe
+                | Some EastWest -> ()
+                | Some NorthEast
+                | Some NorthWest ->
+                    match entryDirection with
+                    | North ->
+                        inside <- not inside
+                        entryDirection <- NotInPipe
+                    | South ->
+                        entryDirection <- NotInPipe
+                    | NotInPipe ->
+                        inside <- not inside
+                        entryDirection <- North
+                | Some SouthEast
+                | Some SouthWest ->
+                    match entryDirection with
+                    | North ->
+                        entryDirection <- NotInPipe
+                    | South ->
+                        inside <- not inside
+                        entryDirection <- NotInPipe
+                    | NotInPipe ->
+                        inside <- not inside
+                        entryDirection <- South
+                | None -> raise (InvalidOperationException "This tile is marked as a pipe")
+            else
+                array[y, x] <- if inside then Inside else Outside
+                entryDirection <- NotInPipe
+
+    array
+
+let renderInsideArea (area: Square[,]) =
+    let renderCharacter = function
+        | Pipe -> 'P'
+        | Inside -> '*'
+        | Outside -> ' '
+
+    area
+    |> Array2D.map renderCharacter
+    |> Array2D.renderChars
+
+findInsideArea sampleInput3
+|> renderInsideArea
+
+#!fsharp
+
+findInsideArea challengeInput
+|> Seq.cast<Square>
+|> Seq.filter ((=) Inside)
+|> Seq.length
