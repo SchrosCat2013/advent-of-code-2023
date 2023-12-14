@@ -1,0 +1,251 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"fsharp","items":[{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+
+#!markdown
+
+# --- Day 11: Cosmic Expansion ---
+You continue following signs for "Hot Springs" and eventually come across an observatory. The Elf within turns out to be a researcher studying cosmic expansion using the giant telescope here.
+
+He doesn't know anything about the missing machine parts; he's only visiting for this research project. However, he confirms that the hot springs are the next-closest area likely to have people; he'll even take you straight there once he's done with today's observation analysis.
+
+Maybe you can help him with the analysis to speed things up?
+
+The researcher has collected a bunch of data and compiled the data into a single giant image (your puzzle input). The image includes empty space (.) and galaxies (#). For example:
+
+```
+...#......
+.......#..
+#.........
+..........
+......#...
+.#........
+.........#
+..........
+.......#..
+#...#.....
+```
+The researcher is trying to figure out the sum of the lengths of the shortest path between every pair of galaxies. However, there's a catch: the universe expanded in the time it took the light from those galaxies to reach the observatory.
+
+Due to something involving gravitational effects, only some space expands. In fact, the result is that any rows or columns that contain no galaxies should all actually be twice as big.
+
+In the above example, three columns and two rows contain no galaxies:
+
+```
+   v  v  v
+ ...#......
+ .......#..
+ #.........
+>..........<
+ ......#...
+ .#........
+ .........#
+>..........<
+ .......#..
+ #...#.....
+   ^  ^  ^
+```
+These rows and columns need to be twice as big; the result of cosmic expansion therefore looks like this:
+
+```
+....#........
+.........#...
+#............
+.............
+.............
+........#....
+.#...........
+............#
+.............
+.............
+.........#...
+#....#.......
+```
+
+Equipped with this expanded universe, the shortest path between every pair of galaxies can be found. It can help to assign every galaxy a unique number:
+
+```
+....1........
+.........2...
+3............
+.............
+.............
+........4....
+.5...........
+............6
+.............
+.............
+.........7...
+8....9.......
+```
+In these 9 galaxies, there are 36 pairs. Only count each pair once; order within the pair doesn't matter. For each pair, find any shortest path between the two galaxies using only steps that move up, down, left, or right exactly one . or # at a time. (The shortest path between two galaxies is allowed to pass through another galaxy.)
+
+For example, here is one of the shortest paths between galaxies 5 and 9:
+
+```
+....1........
+.........2...
+3............
+.............
+.............
+........4....
+.5...........
+.##.........6
+..##.........
+...##........
+....##...7...
+8....9.......
+```
+
+This path has length 9 because it takes a minimum of nine steps to get from galaxy 5 to galaxy 9 (the eight locations marked # plus the step onto galaxy 9 itself). Here are some other example shortest path lengths:
+
+* Between galaxy 1 and galaxy 7: 15
+* Between galaxy 3 and galaxy 6: 17
+* Between galaxy 8 and galaxy 9: 5
+
+In this example, after expanding the universe, the sum of the shortest path between all 36 pairs of galaxies is 374.
+
+Expand the universe, then find the length of the shortest path between every pair of galaxies. What is the sum of these lengths?
+
+#!fsharp
+
+#!import shared.fs
+open Shared
+
+let parseInput (input: string array) =
+    let parseChar (y: int) (x: int) = function
+    | '#' -> Some { x = x; y = y; }
+    | _ -> None
+
+    let parseRow (y: int) (row: char seq) =
+        row
+        |> Seq.mapi (parseChar y)
+        |> Seq.choose id
+    
+    input
+    |> Seq.mapi parseRow
+    |> Seq.concat
+    |> Array.ofSeq
+
+let sampleInput =
+    [|
+        "...#......"
+        ".......#.."
+        "#........."
+        ".........."
+        "......#..."
+        ".#........"
+        ".........#"
+        ".........."
+        ".......#.."
+        "#...#....."
+    |]
+    |> parseInput
+
+sampleInput
+
+#!fsharp
+
+let findBounds (input: Point array) =
+    let folder (minx, miny, maxx, maxy) point = 
+        (min point.x minx, min point.y miny, max point.x maxx, max point.y maxy)
+
+    ((Int32.MaxValue, Int32.MaxValue, Int32.MinValue, Int32.MinValue), input)
+    ||> Array.fold folder
+
+findBounds sampleInput
+
+#!fsharp
+
+let expander (field: Point->int) (pointAdjuster: int->Point->Point) (data: Point seq) =
+    let folder (prevIndex: int option, increment: int) (index: int, points: Point seq) =
+        match prevIndex with
+        | None -> (points, (Some index, increment))
+        | Some i ->
+            let nextIncrement = increment + (index - i - 1)
+            (
+                points |> Seq.map (pointAdjuster nextIncrement),
+                (Some index, nextIncrement)
+            )
+
+    data
+    |> Seq.groupBy field
+    |> Seq.sortBy fst
+    |> Seq.mapFold folder (None, 0)
+    |> fst
+    |> Seq.collect id
+
+let expandPoints (input: Point array) =
+    input
+    |> expander (fun point -> point.x) (fun i point -> { point with x = point.x + i })
+    |> expander (fun point -> point.y) (fun i point -> { point with y = point.y + i })
+    |> Array.ofSeq
+
+let sampleExpanded = expandPoints sampleInput
+sampleExpanded
+
+#!markdown
+
+We're expecting it to look like this:
+```
+ 0123456789012
+0....#........0
+1.........#...1
+2#............2
+3.............3
+4.............4
+5........#....5
+6.#...........6
+7............#7
+8.............8
+9.............9
+0.........#...0
+1#....#.......1
+ 0123456789012
+```
+
+ie.
+```f#
+{ x =  4; y = 0 }
+{ x =  9; y = 1 }
+{ x =  0; y = 2 }
+{ x =  8; y = 5 }
+{ x =  1; y = 6 }
+{ x = 12; y = 7 }
+{ x =  9; y = 10 }
+{ x =  0; y = 11 }
+{ y =  5; y = 11 }
+```
+
+Looks like it's working
+
+#!fsharp
+
+let shortestDistance = function
+    | [ p1; p2 ] ->
+        ((max p1.x p2.x) - (min p1.x p2.x))
+        + ((max p1.y p2.y) - (min p1.y p2.y))
+    | _ -> raise (InvalidOperationException "Expected two points")
+
+let sumShortestPath (input: Point array) =
+    input
+    |> List.ofArray
+    |> List.comb 2
+    |> Seq.map shortestDistance
+    |> Seq.sum
+
+sumShortestPath sampleExpanded
+
+#!fsharp
+
+let challengeInput =
+    File.ReadAllLinesAsync "day 11 input.txt"
+    |> Async.AwaitTask
+    |> Async.RunSynchronously
+    |> parseInput
+
+let expandedChallenge =
+    challengeInput
+    |> expandPoints
+
+sumShortestPath expandedChallenge

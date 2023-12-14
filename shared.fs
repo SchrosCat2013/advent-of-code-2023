@@ -52,6 +52,13 @@ module Shared =
                 enumerators |> Array.iter (fun e -> e.Dispose())
         }
 
+module List =
+    let rec comb n l = 
+        match n, l with
+        | 0, _ -> [[]]
+        | _, [] -> []
+        | k, (x::xs) -> List.map ((@) [x]) (comb (k-1) xs) @ comb k xs
+
 module Array2D =
     let tryGet<'T> (y: int) (x: int) (array: 'T[,]) =
         if y >= 0 && x >= 0 && y < (Array2D.length1 array) && x < (Array2D.length2 array)
