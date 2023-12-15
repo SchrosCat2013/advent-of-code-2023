@@ -173,15 +173,15 @@ let expander (field: Point->int) (pointAdjuster: int->Point->Point) (data: Point
     |> Seq.sortBy fst
     |> Seq.mapFold folder (None, 0)
     |> fst
-    |> Seq.collect id
+    |> Seq.concat
 
-let expandPoints (input: Point array) =
+let expandPoints (amount: int) (input: Point array) =
     input
-    |> expander (fun point -> point.x) (fun i point -> { point with x = point.x + i })
-    |> expander (fun point -> point.y) (fun i point -> { point with y = point.y + i })
+    |> expander (fun point -> point.x) (fun i point -> { point with x = point.x + amount * i })
+    |> expander (fun point -> point.y) (fun i point -> { point with y = point.y + amount * i })
     |> Array.ofSeq
 
-let sampleExpanded = expandPoints sampleInput
+let sampleExpanded = expandPoints 1 sampleInput
 sampleExpanded
 
 #!markdown
@@ -223,18 +223,18 @@ Looks like it's working
 
 let shortestDistance = function
     | [ p1; p2 ] ->
-        ((max p1.x p2.x) - (min p1.x p2.x))
-        + ((max p1.y p2.y) - (min p1.y p2.y))
+        int64 ((max p1.x p2.x) - (min p1.x p2.x))
+        + int64 ((max p1.y p2.y) - (min p1.y p2.y))
     | _ -> raise (InvalidOperationException "Expected two points")
 
-let sumShortestPath (input: Point array) =
+let sumShortestPaths (input: Point array) =
     input
     |> List.ofArray
     |> List.comb 2
     |> Seq.map shortestDistance
     |> Seq.sum
 
-sumShortestPath sampleExpanded
+sumShortestPaths sampleExpanded
 
 #!fsharp
 
@@ -244,8 +244,33 @@ let challengeInput =
     |> Async.RunSynchronously
     |> parseInput
 
-let expandedChallenge =
-    challengeInput
-    |> expandPoints
+challengeInput
+|> expandPoints 1
+|> sumShortestPaths
 
-sumShortestPath expandedChallenge
+#!markdown
+
+# --- Part Two ---
+The galaxies are much older (and thus much farther apart) than the researcher initially estimated.
+
+Now, instead of the expansion you did before, make each empty row or column one million times larger. That is, each empty row should be replaced with 1000000 empty rows, and each empty column should be replaced with 1000000 empty columns.
+
+(In the example above, if each empty row or column were merely 10 times larger, the sum of the shortest paths between every pair of galaxies would be 1030. If each empty row or column were merely 100 times larger, the sum of the shortest paths between every pair of galaxies would be 8410. However, your universe will need to expand far beyond these values.)
+
+Starting with the same initial image, expand the universe according to these new rules, then find the length of the shortest path between every pair of galaxies. What is the sum of these lengths?
+
+#!fsharp
+
+sampleInput
+|> expandPoints 9
+|> sumShortestPaths
+
+#!fsharp
+
+challengeInput
+|> expandPoints 999999
+|> sumShortestPaths
+
+#!markdown
+
+Not sure why I needed to use 999,999 instead of 1,000,000, but it worked
