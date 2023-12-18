@@ -211,3 +211,191 @@ open Shared
 let challengeInput = readAndParseInput "day 12 input.txt" parseRow
 
 part1 challengeInput
+
+#!markdown
+
+Part 1 answer: 7221
+
+## --- Part Two ---
+As you look out at the field of springs, you feel like there are way more springs than the condition records list. When you examine the records, you discover that they were actually folded up this whole time!
+
+To unfold the records, on each row, replace the list of spring conditions with five copies of itself (separated by ?) and replace the list of contiguous groups of damaged springs with five copies of itself (separated by ,).
+
+So, this row:
+
+.# 1
+Would become:
+
+.#?.#?.#?.#?.# 1,1,1,1,1
+The first line of the above example would become:
+
+???.###????.###????.###????.###????.### 1,1,3,1,1,3,1,1,3,1,1,3,1,1,3
+In the above example, after unfolding, the number of possible arrangements for some rows is now much larger:
+
+```
+???.### 1,1,3 - 1 arrangement
+.??..??...?##. 1,1,3 - 16384 arrangements
+?#?#?#?#?#?#?#? 1,3,1,6 - 1 arrangement
+????.#...#... 4,1,1 - 16 arrangements
+????.######..#####. 1,6,5 - 2500 arrangements
+?###???????? 3,2,1 - 506250 arrangements
+```
+
+After unfolding, adding all of the possible arrangement counts together produces 525152.
+
+Unfold your condition records; what is the new sum of possible arrangement counts?
+
+#!fsharp
+
+let repeat<'T> (count: int) (joiner: 'T) (input: 'T array) =
+    seq {
+        for i = 1 to count - 1 do
+            yield! input
+            yield joiner
+
+        yield! input
+    }
+    |> Array.ofSeq
+
+let expandRow (input: SpringRow) = {
+    state = input.state |> repeat 5 Unknown
+    operationalGroups = input.operationalGroups |> Seq.replicate 5 |> Array.concat
+}
+
+sampleInput
+|> Array.map (expandRow >> possibilities' >> Seq.length)
+
+#!fsharp
+
+let part2 (input: SpringRow array) =
+    input
+    |> Seq.map (expandRow >> possibilities' >> Seq.length >> int64)
+    |> Seq.sum
+
+part2 sampleInput
+
+#!markdown
+
+That was taking too long for part 2. Lets see if we can speed it up - first try returning counts directly, rather than the matching arrays:
+
+#!fsharp
+
+// Not purely functional. Mutates the state input array to avoid creating many intermediate
+// arrays
+let rec possibilityCount (state: SpringState array) (operationalGroups: int array) =
+    if possibilityCouldBeValid (state.AsSpan()) (operationalGroups.AsSpan())
+    then
+        match state |> Array.tryFindIndex ((=) Unknown) with
+        | None -> 1L
+        | Some index ->
+            state[index] <- Operational
+            let withOperational = possibilityCount state operationalGroups
+            
+            state[index] <- Damaged
+            let withDamaged = possibilityCount state operationalGroups
+
+            state[index] <- Unknown
+            withOperational + withDamaged
+    else 0L
+
+let possibilityCount' (input: SpringRow) =
+    possibilityCount (Array.copy input.state) input.operationalGroups
+
+sampleInput
+|> Array.map possibilityCount'
+
+#!fsharp
+
+sampleInput
+|> Array.map (expandRow >> possibilityCount')
+
+#!fsharp
+
+challengeInput[0..9]
+|> Array.map (expandRow >> possibilityCount')
+
+#!markdown
+
+Took 60 seconds to calculate 10 inputs. There are 1000 inputs, so that's 100 mins (~2 hours). Still too long.
+
+#!fsharp
+
+let findValidLocations (length: int) (state: SpringState array) =
+    seq {
+        for i = 0 to state.Length - length do
+            let terminatedAtStart = i = 0 || state[i - 1] <> Operational
+            let terminatedAtEnd = i = state.Length - length || state[i + length] <> Operational
+            let containsNoDamaged = state[i..i+length-1] |> Array.contains Damaged |> not
+            if terminatedAtStart && terminatedAtEnd && containsNoDamaged then i
+    }
+
+[|
+    "### 3"
+    "###. 3"
+    ".### 3"
+    ".###. 3"
+    ".####. 3"
+    "## 3"
+    "##. 3"
+    ".## 3"
+    ".##. 3"
+    "??? 3"
+    "???. 3"
+    ".??? 3"
+    ".????. 3"
+    ".?##?. 3"
+|]
+|> Array.map (parseRow >> (fun line -> findValidLocations line.operationalGroups[0] line.state))
+
+#!fsharp
+
+let rec possibilityCount'' (state: SpringState array) (operationalGroups: int array) =
+    match operationalGroups |> Seq.maxi with
+    | None -> if state |> Array.contains Operational then 0L else 1L
+    | Some (opi, len) ->
+        findValidLocations len state
+        |> Seq.map (fun statei ->
+            // This is an optimisation - don't check the second half if the first
+            // half has zero possibilities. Cuts certain samples down considerably
+            let tmp = (possibilityCount'' state[0..statei-2] operationalGroups[0..opi-1])
+            if tmp = 0L
+            then 0L
+            else tmp * (possibilityCount'' state[statei+len+1..] operationalGroups[opi+1..])
+            )
+        |> Seq.sum
+
+sampleInput
+|> Array.map (fun row -> possibilityCount'' row.state row.operationalGroups)
+
+#!fsharp
+
+sampleInput
+|> Array.map (expandRow >> fun row -> possibilityCount'' row.state row.operationalGroups)
+
+#!markdown
+
+Woot, that looks like it's working. Still took 0.6s for that, but let's try memoizing it. Memoizing didn't help - made it take significantly longer.
+
+I needed to add in the zero-left-value optimization check, that greatly improved performance - 0.0s for sampleInput, 0.4s for first 10 entries of challengeInput
+
+#!fsharp
+
+challengeInput[0..9]
+|> Array.map (expandRow >> fun row -> possibilityCount'' row.state row.operationalGroups)
+
+#!fsharp
+
+let part2 (input: SpringRow array) =
+    input
+    |> Seq.map (expandRow >> fun row -> possibilityCount'' row.state row.operationalGroups)
+    |> Seq.sum
+
+part2 sampleInput
+
+#!fsharp
+
+part2 challengeInput
+
+#!markdown
+
+That had not completed in 30m. Need to optimise further

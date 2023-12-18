@@ -52,6 +52,35 @@ module Shared =
                 enumerators |> Array.iter (fun e -> e.Dispose())
         }
 
+    let memoize f =
+        let dict = Dictionary<_, _>();
+        fun c ->
+            let exist, value = dict.TryGetValue c
+            match exist with
+            | true -> value
+            | _ -> 
+                let value = f c
+                dict.Add(c, value)
+                value
+
+module Seq =
+    let private miniMaxiFolder<'T> (op: 'T->'T->bool) (index: int, mIndex: int, mValOpt: 'T option) (v: 'T) =
+        match mValOpt with
+        | Some mVal ->
+            if op v mVal
+            then (index+1, index, Some v)
+            else (index+1, mIndex, Some mVal)
+        | None -> (index + 1, index, Some v)
+
+    let maxi<'T when 'T: comparison> (s: 'T seq) =
+        match s |> Seq.fold (miniMaxiFolder (>)) (0, 0, None) with
+        | (_, i, Some v) -> Some (i, v)
+        | _ -> None
+    let mini<'T when 'T: comparison> (s: 'T seq) =
+        match s |> Seq.fold (miniMaxiFolder (<)) (0, 0, None) with
+        | (_, i, Some v) -> Some (i, v)
+        | _ -> None
+
 module List =
     let rec comb n l = 
         match n, l with
