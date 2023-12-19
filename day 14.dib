@@ -1,6 +1,6 @@
 #!meta
 
-{"kernelInfo":{"defaultKernelName":"fsharp","items":[{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"},{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
 
 #!markdown
 
@@ -95,18 +95,25 @@ let rec tilt (direction: char[,]->int->int->char) (grid: char[,]) =
     then grid
     else tilt direction next
 
-let north (grid: char[,]) (y: int) (x: int) =
+let direction (next: (int * int)->(int * int)) (previous: (int * int)->(int * int)) (grid: char[,]) (y: int) (x: int) =
     match grid[y, x] with
     | '#' -> '#'
     | '.' ->
-        if y + 1 < (Array2D.length1 grid) && grid[y + 1, x] = 'O'
+        let (y', x') = next(y, x)
+        if y' >= 0 && y' < (Array2D.length1 grid) && x' >= 0 && x' < (Array2D.length2 grid) && grid[y', x'] = 'O'
         then 'O'
         else '.'
     | 'O' ->
-        if y - 1 >= 0 && grid[y - 1, x] = '.'
+        let (y', x') = previous(y, x)
+        if y' >= 0 && y' < (Array2D.length1 grid) && x' >= 0 && x' < (Array2D.length2 grid) && grid[y', x'] = '.'
         then '.'
         else 'O'
     | _ -> raise (InvalidOperationException $"Encountered unexpected character {grid[y,x]}")
+
+let north = direction (fun (y, x) -> (y+1, x)) (fun (y, x) -> (y-1, x))
+let south = direction (fun (y, x) -> (y-1, x)) (fun (y, x) -> (y+1, x))
+let west = direction (fun (y, x) -> (y, x+1)) (fun (y, x) -> (y, x-1))
+let east = direction (fun (y, x) -> (y, x-1)) (fun (y, x) -> (y, x+1))
 
 sampleInput
 |> tilt north
@@ -136,3 +143,65 @@ let challengeInput =
 challengeInput
 |> tilt north
 |> totalLoad
+
+#!fsharp
+
+let cycle =
+    tilt north
+    >> tilt west
+    >> tilt south
+    >> tilt east
+
+sampleInput
+|> cycle
+|> Array2D.renderChars
+
+#!markdown
+
+Looks good. Let's try this for 1000000000 cycles on the sample
+
+#!fsharp
+
+type Cycles = {
+    start: int
+    length: int
+    grids: Map<int, char[,]>
+}
+
+let rec findCycles' (memo: Dictionary<string, (int * char [,])>) (input: char[,]) (index: int) =
+    let key = (input |> Seq.cast |> Array.ofSeq |> String)
+    match memo.TryGetValue key with
+    | (true, (i, _)) -> {
+            start = i
+            length = (memo.Values |> Seq.map fst |> Seq.max) - i + 1
+            grids = memo.Values |> Map
+        }
+    | (false, _) ->
+        memo[key] <- (index, input)
+        findCycles' memo (cycle input) (index+1)
+
+let findCycles (input: char[,]) = findCycles' (Dictionary<string, (int * char[,])>()) input 0
+
+sampleInput |> findCycles
+
+#!fsharp
+
+let repeat (i: int) (input: char[,]) =
+    let cycles = findCycles input
+    if i < cycles.start
+    then cycles.grids[i]
+    else cycles.grids[(i - cycles.start) % cycles.length + cycles.start]
+
+sampleInput |> repeat 1_000_000_000 |> totalLoad
+
+#!fsharp
+
+challengeInput |> repeat 1_000_000_000 |> totalLoad
+
+#!fsharp
+
+challengeInput |> findCycles
+
+#!markdown
+
+What I should really do is figure out the "cycle" length, and use that to determine the value at a given point. 
