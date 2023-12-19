@@ -137,49 +137,70 @@ sampleInput1[0..2,*] |> Array2D.rev2 |> Array2D.renderChars
 
 #!fsharp
 
-let isHorizontalMirror (input: char[,]) (y: int) =
+let isHorizontalMirror (comparator: char seq->char seq->bool) (input: char[,]) (y: int) =
     let linesToConsider = min y ((Array2D.length1 input) - y)
 
     let top = input[y-linesToConsider..y-1,*]
     let bottom = input[y..y+linesToConsider-1,*] |> Array2D.rev1
 
-    Seq.equal (Seq.cast top) (Seq.cast bottom)
+    comparator (Seq.cast top) (Seq.cast bottom)
 
-let findHorizontalMirrors (input: char[,]) =
+let findHorizontalMirrors (comparator: char seq->char seq->bool) (input: char[,]) =
     seq { 1..(Array2D.length1 input)-1 }
-    |> Seq.tryFind (isHorizontalMirror input)
+    |> Seq.tryFind (isHorizontalMirror comparator input)
 
-sampleInput2 |> findHorizontalMirrors
+sampleInput2 |> findHorizontalMirrors Seq.equal
 
 #!fsharp
 
-let isVerticalMirror (input: char[,]) (x: int) =
+let isVerticalMirror (comparator: char seq->char seq->bool) (input: char[,]) (x: int) =
     let colsToConsider = min x ((Array2D.length2 input) - x)
 
     let left = input[*,x-colsToConsider..x-1]
     let right = input[*,x..x+colsToConsider-1] |> Array2D.rev2
 
-    Seq.equal (Seq.cast left) (Seq.cast right)
+    comparator (Seq.cast left) (Seq.cast right)
 
-let findVerticalMirrors (input: char[,]) =
+let findVerticalMirrors (comparator: char seq->char seq->bool) (input: char[,]) =
     seq { 1..(Array2D.length2 input)-1 }
-    |> Seq.tryFind (isVerticalMirror input)
+    |> Seq.tryFind (isVerticalMirror comparator input)
 
-sampleInput1 |> findVerticalMirrors
+sampleInput1 |> findVerticalMirrors Seq.equal
 
 #!fsharp
 
-let reflectionNumber (input: char[,]) =
-    match (findHorizontalMirrors input, findVerticalMirrors input) with
+let reflectionNumber (comparator: char seq->char seq->bool) (input: char[,]) =
+    match (findHorizontalMirrors comparator input, findVerticalMirrors comparator input) with
     | Some h, None -> h * 100
     | None, Some v -> v
-    | _ -> raise (InvalidOperationException "Could not find mirror for input")
+    | _ ->
+        printfn "Could not find mirror for input:"
+        Array2D.renderChars input
+        raise (InvalidOperationException "Could not find mirror for input")
 
 [| sampleInput1; sampleInput2 |]
-|> Array.map reflectionNumber
+|> Array.map (reflectionNumber Seq.equal)
 
 #!fsharp
 
-let part1 = Seq.map reflectionNumber >> Seq.sum
+let part1 = Seq.map (reflectionNumber Seq.equal) >> Seq.sum
 
 part1 challengeInput
+
+#!fsharp
+
+let smudgeComparer input1 input2 =
+    (input1, input2)
+    ||> Seq.zip
+    |> Seq.filter (fun (a, b) -> a <> b)
+    |> Seq.length
+    |> (=) 1
+
+[| sampleInput1; sampleInput2 |]
+|> Array.map (reflectionNumber smudgeComparer)
+
+#!fsharp
+
+let part2 = Seq.map (reflectionNumber smudgeComparer) >> Seq.sum
+
+part2 challengeInput
