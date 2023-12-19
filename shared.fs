@@ -81,6 +81,34 @@ module Seq =
         | (_, i, Some v) -> Some (i, v)
         | _ -> None
 
+    let splitBy<'T when 'T : equality> (separator: 'T) (source: 'T seq) =
+        use enumerator = source.GetEnumerator()
+        seq {
+            let mutable cont = enumerator.MoveNext()
+            while cont do
+                yield seq {
+                    while cont && not (enumerator.Current = separator) do
+                        yield enumerator.Current
+                        cont <- enumerator.MoveNext()
+                } |> Array.ofSeq
+
+                if cont then
+                    cont <- enumerator.MoveNext()
+                    if not cont then yield [||]
+        }
+
+    let rec private equal'<'T when 'T: equality> (e1: IEnumerator<'T>) (e2: IEnumerator<'T>) =
+        match e1.MoveNext(), e2.MoveNext() with
+        | false, false -> true
+        | true, true -> e1.Current = e2.Current && equal' e1 e2
+        | _ -> false
+
+    let equal<'T when 'T: equality> (seq1: 'T seq) (seq2: 'T seq) =
+        use e1 = seq1.GetEnumerator()
+        use e2 = seq2.GetEnumerator()
+        
+        equal' e1 e2
+
 module List =
     let rec comb n l = 
         match n, l with
@@ -103,10 +131,8 @@ module Array2D =
         let sb = StringBuilder()
         for y = 0 to Array2D.length1 array - 1 do
             for x = 0 to Array2D.length2 array - 1 do
-                sb.Append array[y,x]
-            sb.AppendLine()
-
-        sb.ToString()
+                printf "%c" array[y, x]
+            printfn ""
 
     let foldi (folder: int -> int -> 'S -> 'T -> 'S) (state: 'S) (array: 'T[,]) =
         let mutable state = state
@@ -138,3 +164,11 @@ module Array2D =
 
     let countWhere<'T> (predicate: 'T -> bool) (array: 'T[,]) =
         countWherei (fun y x -> predicate) array
+
+    let rev1<'T> (array: 'T[,]) =
+        let (len1, len2) = (Array2D.length1 array, Array2D.length2 array)
+        Array2D.init len1 len2 (fun y x -> array[len1 - y - 1, x])
+
+    let rev2<'T> (array: 'T[,]) =
+        let (len1, len2) = (Array2D.length1 array, Array2D.length2 array)
+        Array2D.init len1 len2 (fun y x -> array[y, len2 - x - 1])
