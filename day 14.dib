@@ -168,19 +168,18 @@ type Cycles = {
     grids: Map<int, char[,]>
 }
 
-let rec findCycles' (memo: Dictionary<string, (int * char [,])>) (input: char[,]) (index: int) =
-    let key = (input |> Seq.cast |> Array.ofSeq |> String)
-    match memo.TryGetValue key with
-    | (true, (i, _)) -> {
+let rec findCycles' (memo: Dictionary<char [,], int>) (input: char[,]) (index: int) =
+    match memo.TryGetValue input with
+    | (true, i) -> {
             start = i
-            length = (memo.Values |> Seq.map fst |> Seq.max) - i + 1
-            grids = memo.Values |> Map
+            length = (memo.Values |> Seq.max) - i + 1
+            grids = memo |> Seq.map (fun kvp -> (kvp.Value, kvp.Key)) |> Map
         }
     | (false, _) ->
-        memo[key] <- (index, input)
+        memo[input] <- index
         findCycles' memo (cycle input) (index+1)
 
-let findCycles (input: char[,]) = findCycles' (Dictionary<string, (int * char[,])>()) input 0
+let findCycles (input: char[,]) = findCycles' (Dictionary<char[,], int>(Array2DComparer<char>())) input 0
 
 sampleInput |> findCycles
 

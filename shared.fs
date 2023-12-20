@@ -172,3 +172,15 @@ module Array2D =
     let rev2<'T> (array: 'T[,]) =
         let (len1, len2) = (Array2D.length1 array, Array2D.length2 array)
         Array2D.init len1 len2 (fun y x -> array[y, len2 - x - 1])
+
+type Array2DComparer<'T> () =
+    interface IEqualityComparer<'T [,]> with
+        member this.Equals(a1: 'T[,], a2: 'T[,]) =
+            Array2D.length1 a1 = Array2D.length1 a2
+            && Array2D.length2 a1 = Array2D.length2 a2
+            && Seq.equal (a1 |> Seq.cast) (a2 |> Seq.cast)
+
+        member this.GetHashCode(a1: 'T[,]) =
+            let hc = HashCode()
+            a1 |> Array2D.iter (fun v -> hc.Add(v))
+            hc.ToHashCode()
