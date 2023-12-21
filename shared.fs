@@ -8,6 +8,19 @@ module Shared =
         y: int
     }
 
+    type Direction =
+        | Up
+        | Down
+        | Left
+        | Right
+
+    let move (d: Direction) (p: Point) =
+        match d with
+        | Up -> { p with y = p.y - 1 }
+        | Down -> { p with y = p.y + 1 }
+        | Left -> { p with x = p.x - 1 }
+        | Right -> { p with x = p.x + 1 }
+
     let splitBy<'T when 'T : equality> (separator: 'T) (source: 'T seq) =
         use enumerator = source.GetEnumerator()
         seq {
@@ -117,8 +130,12 @@ module List =
         | k, (x::xs) -> List.map ((@) [x]) (comb (k-1) xs) @ comb k xs
 
 module Array2D =
+    let inBounds (y: int) (x: int) (array: _[,]) =
+        y >= 0 && y < (Array2D.length1 array)
+        && x >= 0 && x < (Array2D.length2 array)
+
     let tryGet<'T> (y: int) (x: int) (array: 'T[,]) =
-        if y >= 0 && x >= 0 && y < (Array2D.length1 array) && x < (Array2D.length2 array)
+        if array |> inBounds y x
         then Some array[y, x]
         else None
 
@@ -128,11 +145,8 @@ module Array2D =
         |> Seq.map (fun y -> Array.init length2 (fun x -> array[y, x]))
 
     let renderChars (array: char[,]) =
-        let sb = StringBuilder()
-        for y = 0 to Array2D.length1 array - 1 do
-            for x = 0 to Array2D.length2 array - 1 do
-                printf "%c" array[y, x]
-            printfn ""
+        for row in rows array do
+            printfn "%s" (row |> String)
 
     let foldi (folder: int -> int -> 'S -> 'T -> 'S) (state: 'S) (array: 'T[,]) =
         let mutable state = state
